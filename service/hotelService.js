@@ -25,11 +25,14 @@ export const makeReservationService = async (userid, roomid, startdate, enddate,
             return 'roomBooked';
         }
 
+        // 예약 번호 생성
+        const reservationNo = generateReservationNo(); // 예약 번호 생성
+
         // 예약 정보 저장
         const [result] = await db.execute(
             'INSERT INTO reservation (no, userid, roomid, startdate, enddate, count, method, done) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [
-                generateReservationNo(), // 예약 번호 생성 함수
+                reservationNo,  // 생성한 예약 번호 삽입
                 userid,
                 roomid,
                 startdate,
@@ -46,9 +49,10 @@ export const makeReservationService = async (userid, roomid, startdate, enddate,
     }
 };
 
-// 예약 번호 생성 함수
+// 예약 번호 생성 함수 (hotelService.js에 추가)
 const generateReservationNo = () => {
-    return 'R' + Date.now(); // 간단한 예약 번호 예시
+    const now = new Date();
+    return now.toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);  // '20241206071725' 형식
 };
 
 
@@ -70,33 +74,57 @@ export const getReservationsByUserId = async (userid) => {
     }
 };
 
-// 예약 취소 서비스
-export const cancelReservationService = async (userid, roomid) => {
+export const cancelReservationService = async (userid, no) => {
     try {
-        // 예약 확인
+        // 예약 확인: 예약번호(no)와 userid를 모두 조건으로 사용
         const [reservations] = await db.execute(
-            'SELECT * FROM reservation WHERE userid = ? AND roomid = ?',
-            [userid, roomid]
+            'SELECT * FROM reservation WHERE no = ? AND userid = ?',
+            [no, userid]
         );
 
+        console.log('조회된 예약 내역:', reservations);  // 예약 내역 확인
+
+        // 예약이 없을 경우 처리
         if (reservations.length === 0) {
-            // 예약된 객실이 없음
-            return 'noReservation';
+            console.log('예약되지 않은 객실입니다.');
+            return { code: "105", msg: "예약되지 않은 객실" };
         }
 
         const reservation = reservations[0];
-        const today = new Date().toISOString().split('T')[0];
-        const startDate = new Date(reservation.startdate).toISOString().split('T')[0];
+        const today = new Date();
 
-        // 당일 취소 불가
-        if (today === startDate) {
-            return 'noCancelToday';
+        // 예약 시작 날짜를 'yyyy-mm-dd' 형식으로 변환
+        const startDate = new Date(reservation.startdate);
+        const formattedStartDate = startDate.toISOString().slice(0, 10);  // 'yyyy-mm-dd'
+
+        // 오늘 날짜를 'yyyy-mm-dd' 형식으로 변환
+        const formattedToday = today.toISOString().slice(0, 10);  // 'yyyy-mm-dd'
+
+        // 당일 취소 불가 (현재 날짜와 예약 시작 날짜가 같은 경우)
+        if (formattedToday === formattedStartDate) {
+            return { code: "106", msg: "당일 취소 불가" };
         }
 
-        // 예약 취소
-        await db.execute('DELETE FROM reservation WHERE userid = ? AND roomid = ?', [userid, roomid]);
+        // 예약 취소 (삭제) 전에 로그를 찍어보세요.
+        console.log(`예약 취소를 위한 DELETE 쿼리 실행: no = ${no}, userid = ${userid}`);
 
-        return 'success';
+        // DELETE 쿼리 실행
+        const [deleteResult] = await db.execute(
+            'DELETE FROM reservation WHERE no = ? AND userid = ?',
+            [no, userid]
+        );
+
+        // DELETE 실행 결과 확인
+        console.log('DELETE 쿼리 실행 결과:', deleteResult);
+
+        // affectedRows가 0이면 삭제되지 않았음을 알림
+        if (deleteResult.affectedRows === 0) {
+            console.log('삭제된 행이 없습니다. 조건을 다시 확인해보세요.');
+            return { code: "105", msg: "예약되지 않은 객실" };
+        }
+
+        console.log('예약 취소 완료');
+        return { code: "205", msg: "취소 성공" };
     } catch (error) {
         console.error('예약 취소 중 오류 발생:', error);
         throw new Error('예약 취소 중 오류 발생');

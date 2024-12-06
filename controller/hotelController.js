@@ -98,10 +98,10 @@ export const getUserReservations = async (req, res) => {
 
 //예약 취소
 export const cancelReservation = async (req, res) => {
-    const { userid, roomid } = req.body;
+    const { userid, no } = req.body;  // 예약 번호 (no)로 수정, roomid -> no
 
     // 필수 파라미터 검사
-    if (!userid || !roomid) {
+    if (!userid || !no) {
         return res.status(400).json({
             code: '101',
             msg: '비정상 파라미터 전달',
@@ -109,7 +109,7 @@ export const cancelReservation = async (req, res) => {
     }
 
     try {
-        const result = await cancelReservationService(userid, roomid);
+        const result = await cancelReservationService(userid, no);  // roomid -> no
 
         if (result === 'noReservation') {
             return res.status(400).json({

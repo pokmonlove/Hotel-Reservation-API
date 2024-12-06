@@ -17,7 +17,7 @@ CREATE TABLE member (
 CREATE TABLE reservation (
     no VARCHAR(20) PRIMARY KEY,
     userid VARCHAR(50) NOT NULL,
-    roomid VARCHAR(10) NOT NULL,
+    roomid VARCHAR(10) NOT NULL,    
     startdate DATE NOT NULL,
     enddate DATE NOT NULL,
     count INT NOT NULL,
